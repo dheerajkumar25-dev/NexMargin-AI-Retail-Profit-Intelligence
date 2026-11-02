@@ -1,4 +1,3 @@
-
 """Analytical building blocks used by the UI, the AI Copilot and reports.
 
 SQL-backed functions call named queries in sql/business_queries.sql;
@@ -143,6 +142,66 @@ def discount_bands(df: pd.DataFrame) -> pd.DataFrame:
 
 def product_summary(df: pd.DataFrame) -> pd.DataFrame:
     return metrics.group_summary(df, ["product_id", "product_name", "category"])
+
+
+def product_performance_matrix(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Classify products based on revenue and profit margin.
+
+    High Performer: High revenue and high margin.
+    Revenue Driver: High revenue and low margin.
+    Hidden Gem: Low revenue and high margin.
+    Underperformer: Low revenue and low margin.
+    Unclassified: Zero/negative revenue or undefined margin.
+    """
+    result = product_summary(df)
+
+    result["performance"] = pd.Series(
+        index=result.index,
+        dtype="object",
+    )
+
+    if result.empty:
+        return result
+
+    valid = (
+        result["revenue"].gt(0)
+        & result["margin_pct"].notna()
+        & np.isfinite(result["margin_pct"])
+    )
+
+    if not valid.any():
+        result["performance"] = "Unclassified"
+        return result
+
+    revenue_median = result.loc[valid, "revenue"].median()
+    margin_median = result.loc[valid, "margin_pct"].median()
+
+    high_revenue = result["revenue"] >= revenue_median
+    high_margin = result["margin_pct"] >= margin_median
+
+    result.loc[
+        valid & high_revenue & high_margin, "performance"
+    ] = "High Performer"
+
+    result.loc[
+        valid & high_revenue & ~high_margin, "performance"
+    ] = "Revenue Driver"
+
+    result.loc[
+        valid & ~high_revenue & high_margin, "performance"
+    ] = "Hidden Gem"
+
+    result.loc[
+        valid & ~high_revenue & ~high_margin, "performance"
+    ] = "Underperformer"
+
+    result["performance"] = result["performance"].fillna("Unclassified")
+
+    return result.sort_values(
+        ["performance", "revenue"],
+        ascending=[True, False],
+    ).reset_index(drop=True)
 
 
 def top_products_by_revenue(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:

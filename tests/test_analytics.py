@@ -1,10 +1,40 @@
-
 import pandas as pd
 import pytest
 
+from helpers import build_orders
 from nexmargin import analytics as A
 from nexmargin import database as D
 from nexmargin import metrics as M
+
+
+def build_product_orders():
+    """Create four products with different revenue and profit performance."""
+    return build_orders([
+        {
+            "Product ID": "P1",
+            "Product Name": "Product A",
+            "Sales": 400,
+            "Profit": 120,
+        },
+        {
+            "Product ID": "P2",
+            "Product Name": "Product B",
+            "Sales": 300,
+            "Profit": 15,
+        },
+        {
+            "Product ID": "P3",
+            "Product Name": "Product C",
+            "Sales": 100,
+            "Profit": 40,
+        },
+        {
+            "Product ID": "P4",
+            "Product Name": "Product D",
+            "Sales": 50,
+            "Profit": -10,
+        },
+    ])
 
 
 def test_apply_filters(orders):
@@ -191,3 +221,46 @@ def test_customer_concentration_validates_percentage(orders):
 def test_contribution_curve_validates_value(orders):
     with pytest.raises(ValueError, match="sales or profit"):
         A.contribution_curve(orders, value="revenue")
+
+
+# Product performance classification
+def test_product_performance_matrix_classifies_products():
+    df = build_product_orders()
+
+    result = A.product_performance_matrix(df)
+
+    classifications = dict(
+        zip(result["product_name"], result["performance"])
+    )
+
+    assert classifications["Product A"] == "High Performer"
+    assert classifications["Product B"] == "Revenue Driver"
+    assert classifications["Product C"] == "Hidden Gem"
+    assert classifications["Product D"] == "Underperformer"
+
+
+def test_product_performance_matrix_handles_empty_data(orders):
+    result = A.product_performance_matrix(orders.iloc[0:0])
+
+    assert result.empty
+    assert "performance" in result.columns
+
+
+def test_product_performance_matrix_handles_zero_revenue():
+    df = build_product_orders()
+
+    zero_row = df.iloc[[0]].copy()
+    zero_row["product_id"] = "P5"
+    zero_row["product_name"] = "Zero Revenue Product"
+    zero_row["sales"] = 0.0
+    zero_row["profit"] = 0.0
+
+    df = pd.concat([df, zero_row], ignore_index=True)
+
+    result = A.product_performance_matrix(df)
+
+    zero_product = result[
+        result["product_name"] == "Zero Revenue Product"
+    ]
+
+    assert zero_product.iloc[0]["performance"] == "Unclassified"
