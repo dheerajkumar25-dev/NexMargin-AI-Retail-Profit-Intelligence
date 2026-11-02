@@ -1,3 +1,4 @@
+
 """Overview: the executive dashboard."""
 from __future__ import annotations
 
@@ -14,7 +15,11 @@ PLOT = dict(config=charts.PLOT_CONFIG, theme=None, width="stretch")
 
 
 def render(df_all) -> None:
-    page_header("Overview", "Revenue tells you how much you sell. Profit tells you how much you keep.")
+    page_header(
+        "Overview",
+        "Revenue tells you how much you sell. Profit tells you how much you keep.",
+    )
+
     f = filter_bar(df_all, "ov")
     if f.df.empty:
         return empty_state()
@@ -22,25 +27,102 @@ def render(df_all) -> None:
     comparison = A.compare_kpis(f.df_scope, f.start, f.end, f.data_min)
     render_kpis(comparison, metrics.monthly_series(f.df))
 
+    # Customer health metrics
+    st.write("")
+    st.subheader("Customer health")
+
+    customer_col1, customer_col2, customer_col3 = st.columns(3)
+
+    active_customers = f.df["customer_id"].nunique()
+    repeat_rate = metrics.repeat_customer_rate(f.df)
+    avg_discount = metrics.average_discount(f.df)
+
+    with customer_col1:
+        st.metric("Active customers", f"{active_customers:,}")
+
+    with customer_col2:
+        st.metric(
+            "Repeat customer rate",
+            f"{repeat_rate:.1f}%" if repeat_rate is not None else "N/A",
+        )
+
+    with customer_col3:
+        st.metric(
+            "Average discount",
+            f"{avg_discount:.1f}%" if avg_discount is not None else "N/A",
+        )
+
+    # Annual customer retention
+    retention = metrics.annual_retention(f.df)
+
+    if not retention.empty:
+        st.write("")
+        st.subheader("Annual customer retention")
+        st.dataframe(
+            retention,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    # Revenue and profit trend with business insights
     left, right = st.columns([2.2, 1])
+
     with left, card("trend"):
-        card_header("Revenue vs profit", "Monthly trend for the selected period")
-        st.plotly_chart(charts.trend_chart(A.monthly_trend(f.df)), key="chart_ov_trend", **PLOT)
+        card_header(
+            "Revenue vs profit",
+            "Monthly trend for the selected period",
+        )
+        st.plotly_chart(
+            charts.trend_chart(A.monthly_trend(f.df)),
+            key="chart_ov_trend",
+            **PLOT,
+        )
+
     with right, card("insights"):
-        card_header("Business insights", "What stands out in this selection")
+        card_header(
+            "Business insights",
+            "What stands out in this selection",
+        )
         insights = A.business_insights(f.df, limit=3)
+
         if insights:
-            st.markdown("".join(insight_html(i) for i in insights), unsafe_allow_html=True)
+            st.markdown(
+                "".join(insight_html(i) for i in insights),
+                unsafe_allow_html=True,
+            )
         else:
             st.caption("No notable patterns in this selection.")
 
+    # Category and regional profitability
     st.write("")
     c1, c2 = st.columns([1.25, 1])
+
     with c1, card("category"):
-        card_header("Category profitability", "Profit margin by sub-category; dotted line is the overall margin")
-        legend([("Profitable", charts.GREEN), ("Low margin", charts.AMBER), ("Loss-making", charts.RED)])
+        card_header(
+            "Category profitability",
+            "Profit margin by sub-category; dotted line is the overall margin",
+        )
+        legend([
+            ("Profitable", charts.GREEN),
+            ("Low margin", charts.AMBER),
+            ("Loss-making", charts.RED),
+        ])
+
         sub = A.subcategory_margin(f.df)
-        st.plotly_chart(charts.category_bar(sub, comparison["current"]["margin_pct"]), key="chart_ov_cat", **PLOT)
+
+        st.plotly_chart(
+            charts.category_bar(sub, comparison["current"]["margin_pct"]),
+            key="chart_ov_cat",
+            **PLOT,
+        )
+
     with c2, card("region"):
-        card_header("Regional performance", "Revenue and profit by region")
-        st.plotly_chart(charts.region_chart(A.region_performance(f.df)), key="chart_ov_region", **PLOT)
+        card_header(
+            "Regional performance",
+            "Revenue and profit by region",
+        )
+        st.plotly_chart(
+            charts.region_chart(A.region_performance(f.df)),
+            key="chart_ov_region",
+            **PLOT,
+        )
