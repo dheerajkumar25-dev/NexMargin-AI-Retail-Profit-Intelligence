@@ -105,3 +105,10 @@ def test_real_dataset_reconciles():
     assert df["profit"].sum() == pytest.approx(raw.loc[~dup, "Profit"].sum())
     assert df["sales"].sum() == pytest.approx(raw.loc[~dup, "Sales"].sum())
     assert set(RENAME.values()) <= set(df.columns)
+
+def test_duplicate_columns_raise_error():
+    raw = make_raw()
+    raw.columns = list(raw.columns[:-1]) + [raw.columns[0]]
+
+    with pytest.raises(ValueError, match="duplicate columns"):
+        clean(raw)
