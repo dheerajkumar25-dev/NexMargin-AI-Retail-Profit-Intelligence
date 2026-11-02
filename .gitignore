@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.streamlit/secrets.toml
+# Raw dataset is not committed: its licence is not verified. Run scripts/build_data.py to fetch it.
+data/raw/*.csv
+data/processed/*.csv
+data/processed/*.json
+.DS_Store
+
+# Exclude duplicate starter folder
+/NexMargin/
+
+CLAUDE.md
