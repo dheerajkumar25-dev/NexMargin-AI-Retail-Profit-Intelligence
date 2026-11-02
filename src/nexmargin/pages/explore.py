@@ -1,6 +1,8 @@
+
 """Explore: interactive analytics workspace."""
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
 
 from .. import analytics as A
@@ -8,7 +10,7 @@ from .. import metrics, segmentation
 from ..components import charts, tables
 from ..components.kpi_cards import render_kpis
 from ..components.sidebar import filter_bar
-from ..components.styling import card, card_header, empty_state, legend, stat
+from ..components.styling import card, card_header, empty_state, stat
 from ..components.styling import page_header
 from ..forecasting import LIMITATIONS, MIN_MONTHS, forecast_revenue
 from ..formatting import fmt_money, fmt_pct
@@ -452,6 +454,56 @@ def _regions(df) -> None:
             key="chart_ex_r_o",
             **PLOT,
         )
+
+    st.write("")
+
+    # Regional Profitability Benchmark
+    with card("r_benchmark"):
+        card_header(
+            "Regional Profitability Benchmark",
+            "Compare each region's profit margin against the overall business margin.",
+        )
+
+        benchmark = A.regional_margin_benchmark(df)
+
+        if benchmark.empty:
+            st.caption("No regional benchmarking data available.")
+        else:
+            overall = benchmark["overall_margin_pct"].iloc[0]
+
+            if pd.isna(overall):
+                st.info(
+                    "Overall profit margin is unavailable for this selection."
+                )
+            else:
+                st.metric(
+                    "Overall business profit margin",
+                    f"{overall:.2f}%",
+                )
+
+            display = benchmark.copy()
+
+            display["margin_pct"] = display["margin_pct"].map(
+                lambda x: f"{x:.2f}%" if pd.notna(x) else "N/A"
+            )
+
+            display["overall_margin_pct"] = display[
+                "overall_margin_pct"
+            ].map(
+                lambda x: f"{x:.2f}%" if pd.notna(x) else "N/A"
+            )
+
+            display["margin_gap_pp"] = display["margin_gap_pp"].map(
+                lambda x: f"{x:+.2f} pp" if pd.notna(x) else "N/A"
+            )
+
+            tables.show(display, height=250)
+
+            st.caption(
+                "Above Average: higher margin than the business benchmark. "
+                "Below Average: lower margin. "
+                "At Average: within 0.01 percentage points."
+            )
 
     st.write("")
 

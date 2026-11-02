@@ -1,3 +1,4 @@
+
 """Analytical building blocks used by the UI, the AI Copilot and reports.
 
 SQL-backed functions call named queries in sql/business_queries.sql;
@@ -108,6 +109,64 @@ def subcategory_margin(df):
 
 def region_performance(df):
     return run_query("region_performance", df)
+
+
+def regional_margin_benchmark(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compare each region's profit margin with the overall business margin.
+
+    Above Average: regional margin is more than 0.01 percentage points
+    above the overall margin.
+    Below Average: regional margin is more than 0.01 percentage points
+    below the overall margin.
+    At Average: difference is within 0.01 percentage points.
+    Unavailable: margin cannot be calculated.
+    """
+    columns = [
+        "region",
+        "revenue",
+        "profit",
+        "margin_pct",
+        "overall_margin_pct",
+        "margin_gap_pp",
+        "performance",
+    ]
+
+    result = metrics.group_summary(df, "region")
+
+    if result.empty:
+        return pd.DataFrame(columns=columns)
+
+    overall_margin = metrics.profit_margin(df)
+    result["overall_margin_pct"] = overall_margin
+
+    if overall_margin is None:
+        result["margin_gap_pp"] = np.nan
+        result["performance"] = "Unavailable"
+    else:
+        result["margin_gap_pp"] = (
+            result["margin_pct"] - overall_margin
+        )
+
+        result["performance"] = np.select(
+            [
+                result["margin_pct"].isna(),
+                result["margin_gap_pp"] > 0.01,
+                result["margin_gap_pp"] < -0.01,
+            ],
+            [
+                "Unavailable",
+                "Above Average",
+                "Below Average",
+            ],
+            default="At Average",
+        )
+
+    return result[columns].sort_values(
+        "margin_gap_pp",
+        ascending=False,
+        na_position="last",
+    ).reset_index(drop=True)
 
 
 def purchase_frequency(df):

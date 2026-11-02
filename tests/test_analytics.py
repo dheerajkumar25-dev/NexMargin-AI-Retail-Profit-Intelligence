@@ -1,3 +1,4 @@
+
 import pandas as pd
 import pytest
 
@@ -74,6 +75,7 @@ def test_compare_kpis_with_prior_period(orders):
 
 
 # SQL layer
+
 def test_sql_matches_python_metrics(orders):
     m = D.run_query("revenue_by_month", orders)
     assert m["revenue"].sum() == pytest.approx(M.revenue(orders))
@@ -224,6 +226,7 @@ def test_contribution_curve_validates_value(orders):
 
 
 # Product performance classification
+
 def test_product_performance_matrix_classifies_products():
     df = build_product_orders()
 
@@ -264,3 +267,47 @@ def test_product_performance_matrix_handles_zero_revenue():
     ]
 
     assert zero_product.iloc[0]["performance"] == "Unclassified"
+
+
+# Regional profitability benchmark
+
+def test_regional_margin_benchmark_compares_with_overall(orders):
+    result = A.regional_margin_benchmark(orders)
+
+    assert not result.empty
+    assert {
+        "region",
+        "revenue",
+        "profit",
+        "margin_pct",
+        "overall_margin_pct",
+        "margin_gap_pp",
+        "performance",
+    }.issubset(result.columns)
+
+    overall = M.profit_margin(orders)
+
+    assert result["overall_margin_pct"].iloc[0] == pytest.approx(overall)
+    assert result["margin_gap_pp"].iloc[0] == pytest.approx(
+        result["margin_pct"].iloc[0] - overall
+    )
+
+
+def test_regional_margin_benchmark_handles_empty_data(orders):
+    result = A.regional_margin_benchmark(orders.iloc[0:0])
+
+    assert result.empty
+    assert "performance" in result.columns
+
+
+def test_regional_margin_benchmark_classifies_regions():
+    df = build_orders([
+        {"Region": "North", "Sales": 100, "Profit": 30},
+        {"Region": "South", "Sales": 100, "Profit": 10},
+    ])
+
+    result = A.regional_margin_benchmark(df)
+    classifications = dict(zip(result["region"], result["performance"]))
+
+    assert classifications["North"] == "Above Average"
+    assert classifications["South"] == "Below Average"
